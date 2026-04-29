@@ -1,0 +1,8 @@
+retailhero-uplift.zip
+
+retailhero-uplift/data/
+retailhero-uplift/outputs/
+
+__pycache__/
+*.pyc
+.ipynb_checkpoints/

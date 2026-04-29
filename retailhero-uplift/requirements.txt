@@ -1,0 +1,9 @@
+pandas>=2.2,<3.0
+numpy>=2.2,<3.0
+matplotlib>=3.10,<4.0
+duckdb>=1.5,<2.0
+scikit-learn>=1.8,<2.0
+jupyter>=1.1,<2.0
+xgboost>=3.2,<4.0
+causalml>=0.16,<0.17
+seaborn>=0.13,<0.14
