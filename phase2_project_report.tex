@@ -391,43 +391,98 @@ Phase II successfully translated the Phase I findings into a reproducible uplift
 Taken together, the results support the central claim of the project: customer targeting based on expected incremental response is more defensible than targeting based solely on unconditional purchase probability.
 
 \appendix
-\section{Relevant Code Listings}
-The appendix includes the most relevant implementation excerpts directly from the working codebase. Inline comments have been added to the source files to clarify the non-obvious modeling and data-engineering decisions referenced in the main text.
+\section{Selected Code Excerpts and Explanation}
+Only selected excerpts are reproduced below. The purpose of this appendix is to document the decisive implementation logic without reproducing complete source files. Full source code remains available in the project repository; the report includes only those portions that directly support the methodological claims made in the main body.
 
-\subsection{Client and Product Feature Construction}
+\subsection{Client Cleaning and Redemption Feature Construction}
+Listing~\ref{lst:clientfeatures} shows the client-level preprocessing block. This excerpt is important because it demonstrates how Phase I data-quality findings were translated into modeling inputs rather than merely documented descriptively.
+
 \lstinputlisting[
   style=pythonstyle,
   firstline=45,
-  lastline=95,
-  caption={Annotated client-level feature construction in \texttt{phase2\_features.py}},
+  lastline=76,
+  caption={Selected client-level cleaning and redemption-feature logic from \texttt{phase2\_features.py}},
   label={lst:clientfeatures}
 ]{retailhero-uplift/phase2_features.py}
 
+This block performs four tasks. First, it preserves the original age field while creating a bounded version (\texttt{age\_clean}) and an explicit anomaly flag (\texttt{age\_flagged}). Second, it expands the gender code into indicator variables that are directly consumable by the models. Third, it derives customer redemption timing variables, including whether the customer has ever redeemed at all. Fourth, it pairs structurally missing redemption values with missingness indicators before sentinel filling. In methodological terms, this excerpt operationalizes the Phase I conclusion that anomalous ages and redemption-related missingness should be retained as signals rather than silently discarded.
+
+\subsection{Product Behavior Aggregation}
+Listing~\ref{lst:productfeatures} shows the essential part of the DuckDB aggregation used to convert line-item transaction history into client-level product behavior features. The full query is longer than necessary for the report, so only the defining portion is shown.
+
 \lstinputlisting[
   style=pythonstyle,
-  firstline=126,
-  lastline=295,
-  caption={Annotated product-behavior aggregation and share-feature construction in \texttt{phase2\_features.py}},
+  firstline=134,
+  lastline=186,
+  caption={Selected DuckDB aggregation logic for product-behavior features from \texttt{phase2\_features.py}},
   label={lst:productfeatures}
 ]{retailhero-uplift/phase2_features.py}
 
-\subsection{Uplift Model Wrappers}
+This excerpt achieves two things. The first is computational: it pushes the heaviest aggregation work into DuckDB so that the 4.4 GB purchases file does not need to be materialized in pandas at full granularity. The second is analytical: it defines the category spend accumulators, alcohol and own-trademark spend, netto-based measures, and brand concentration inputs that later become normalized client-level behavior signals. This is precisely how the implementation converts anonymized product metadata into usable uplift-model covariates without overstating semantic interpretability.
+
+\subsection{Deterministic Missing-Value Handling}
+Listing~\ref{lst:missinglogic} shows the missing-value strategy used to ensure a complete numeric feature matrix for all models.
+
 \lstinputlisting[
   style=pythonstyle,
-  firstline=74,
-  lastline=210,
-  caption={Annotated uplift model wrappers in \texttt{phase2\_models.py}},
-  label={lst:modelwrappers}
+  firstline=248,
+  lastline=285,
+  caption={Selected deterministic missing-value handling logic from \texttt{phase2\_features.py}},
+  label={lst:missinglogic}
+]{retailhero-uplift/phase2_features.py}
+
+This block is methodologically important because it enforces a consistent contract across all model families. Whenever a feature contains missing values, the code first creates a dedicated missingness indicator and then fills the original field using a deterministic sentinel. Non-negative variables receive a shared negative sentinel, whereas variables with valid negative support receive a value below the observed minimum. The result is that no model consumes unresolved \texttt{NaN} values, while the fact of missingness remains available as an explicit predictor.
+
+\subsection{Linear Uplift Scoring Logic}
+Listing~\ref{lst:linearuplift} presents the core scoring logic for the two logistic uplift baselines.
+
+\lstinputlisting[
+  style=pythonstyle,
+  firstline=108,
+  lastline=157,
+  caption={Selected scoring logic for the two-model and interaction-based logistic uplift estimators from \texttt{phase2\_models.py}},
+  label={lst:linearuplift}
 ]{retailhero-uplift/phase2_models.py}
 
-\subsection{Pipeline Orchestration}
+This excerpt illustrates the two principal linear uplift formulations used in the project. In the two-model approach, separate treated and control response surfaces are estimated and then differenced at prediction time. In the Lo-style interaction approach, one shared model is fit on a treatment-augmented design matrix, and uplift is recovered as the difference between two counterfactual predictions for the same customer. These two formulations are conceptually distinct but mathematically comparable, which makes them suitable benchmark uplift models.
+
+\subsection{Benchmark and Non-Linear Uplift Wrappers}
+Listing~\ref{lst:benchmarkmodels} shows the essential logic behind the CCP benchmark and the non-linear uplift forest.
+
 \lstinputlisting[
   style=pythonstyle,
-  firstline=159,
-  lastline=352,
-  caption={Annotated orchestration flow in \texttt{phase2\_pipeline.py}},
-  label={lst:pipeline}
+  firstline=174,
+  lastline=210,
+  caption={Selected benchmark and non-linear uplift model logic from \texttt{phase2\_models.py}},
+  label={lst:benchmarkmodels}
+]{retailhero-uplift/phase2_models.py}
+
+The first half of the excerpt shows that the CCP benchmark is trained only on control observations, thereby estimating organic purchase propensity rather than treatment effect. The second half shows the uplift random forest wrapper, including the treatment-label encoding required by the \texttt{causalml} API. Together, these two fragments illustrate the central contrast of the report: a conventional non-causal benchmark versus a dedicated non-linear causal-ranking model.
+
+\subsection{End-to-End Orchestration}
+Listing~\ref{lst:orchestrate1} shows how the pipeline rebuilds features, performs the outer validation split, and trains the four planned models.
+
+\lstinputlisting[
+  style=pythonstyle,
+  firstline=171,
+  lastline=233,
+  caption={Selected training-stage orchestration from \texttt{phase2\_pipeline.py}},
+  label={lst:orchestrate1}
 ]{retailhero-uplift/phase2_pipeline.py}
+
+This excerpt demonstrates that the entire Phase II workflow is driven from raw inputs and a small CLI configuration, rather than from manually prepared notebook artifacts. It also shows that the model comparison is operationally fair: the same feature bundle, validation split, and business assumptions are passed into each estimator.
+
+Listing~\ref{lst:orchestrate2} shows how the validation scores are converted into ranked outputs, evaluated, and persisted as reusable artifacts.
+
+\lstinputlisting[
+  style=pythonstyle,
+  firstline=257,
+  lastline=327,
+  caption={Selected evaluation and artifact-writing logic from \texttt{phase2\_pipeline.py}},
+  label={lst:orchestrate2}
+]{retailhero-uplift/phase2_pipeline.py}
+
+This final excerpt shows how the pipeline turns model outputs into submission-relevant deliverables. Each model produces validation scores, test scores, ranking columns, summary metrics, curve tables, and parameter logs. The evaluation object is therefore not merely printed to screen; it is written into structured artifacts that support auditability, figure generation, and downstream targeting analysis.
 
 \section{Reproduction Commands}
 \noindent Execute the following commands from the project directory.
