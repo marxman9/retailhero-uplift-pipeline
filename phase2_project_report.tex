@@ -19,7 +19,8 @@
   colorlinks=true,
   linkcolor=blue,
   urlcolor=blue,
-  citecolor=blue
+  citecolor=blue,
+  plainpages=false
 }
 
 \definecolor{codebg}{RGB}{248,248,248}
@@ -35,7 +36,10 @@
   showstringspaces=false,
   breaklines=true,
   frame=single,
-  tabsize=4
+  tabsize=4,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  captionpos=b
 }
 
 \title{Phase II Project Report\\RetailHero Uplift Modeling: CCP vs CCU Evaluation}
@@ -44,38 +48,54 @@
 
 \begin{document}
 
-\maketitle
+\hypersetup{pageanchor=false}
+\begin{titlepage}
+\centering
+{\Large \textbf{HSL-530}\par}
+\vspace{0.25cm}
+{\large Data Analytics for Business \& Society\par}
 
-\begin{center}
-\large \textbf{Course:} HSL-530 Data Analytics for Business \& Society
+\vspace{2.2cm}
+{\Huge \textbf{Phase II Project Report}\par}
+\vspace{0.6cm}
+{\LARGE RetailHero Uplift Modeling: CCP vs CCU Evaluation\par}
 
-\vspace{0.4em}
-\normalsize
-\textbf{Team Members:} Anand Deep (21322003), Aniket (21322005), Madhav Mukund (21322018), Param Mahabare (21322021)
-\end{center}
+\vspace{1.8cm}
+{\large Submitted by\par}
+\vspace{0.4cm}
+{\large Anand Deep (21322003)\par}
+{\large Aniket (21322005)\par}
+{\large Madhav Mukund (21322018)\par}
+{\large Param Mahabare (21322021)\par}
 
-\vspace{1em}
+\vfill
+{\large 29 April 2026\par}
+\end{titlepage}
+\hypersetup{pageanchor=true}
 
+\pagenumbering{roman}
 \begin{abstract}
-This report documents the Phase II implementation of a value-aware uplift-modeling pipeline for the RetailHero / X5 retail intervention dataset. The work extends Phase I, which established that the campaign was effectively randomized, that the average treatment effect was modest, and that response heterogeneity was large enough to justify uplift modeling. Phase II operationalizes that finding by comparing a standard customer purchase-propensity baseline (CCP) against three customer churn uplift (CCU) estimators under one reproducible evaluation framework. The pipeline rebuilds features directly from the raw CSV files, trains all models on the full extracted dataset, evaluates them on a stratified holdout set, and reports Qini, liftup, predictive maximum profit, and maximum profit uplift. The final result is that the uplift random forest is the strongest incremental-targeting model, outperforming the CCP baseline on uplift-specific metrics while preserving a transparent, reproducible workflow.
+This report presents the Phase II implementation and evaluation of a value-aware uplift-modeling pipeline for the RetailHero / X5 retail intervention dataset. Phase I established that campaign assignment was effectively randomized, that the average treatment effect was positive but modest, and that treatment response varied materially across customer segments. Phase II builds on those findings by comparing a conventional customer purchase-propensity benchmark (CCP) with three customer churn uplift (CCU) estimators under a common experimental framework. Features are reconstructed directly from the raw source files, models are trained on a stratified development split, and performance is assessed on a held-out validation sample using Qini, liftup, predictive maximum profit, and maximum profit uplift. The empirical results indicate that the uplift random forest provides the strongest incremental-targeting performance, whereas the CCP benchmark is most appropriately interpreted as a non-causal propensity baseline.
 \end{abstract}
 
+\newpage
 \tableofcontents
 \newpage
+\pagenumbering{arabic}
 
-\section{Project Objective}
-The objective of Phase II was to implement a defensible, reproducible comparison between:
+\section{Introduction and Objective}
+The objective of Phase II was to construct a reproducible and methodologically coherent comparison between:
 \begin{itemize}
     \item \textbf{Model A: CCP baseline}, a standard purchase-propensity model trained only on the control group.
     \item \textbf{Model B: CCU models}, uplift estimators that rank customers by expected incremental response to treatment.
 \end{itemize}
 
-The practical research question is:
+The central research question addressed in this phase is as follows:
 \begin{quote}
 Can the intervention be targeted more efficiently by ranking customers on expected incremental value rather than raw purchase likelihood?
 \end{quote}
 
-This framing matters because a customer who is highly likely to buy anyway may still be a poor target for campaign spend. Uplift modeling is valuable only if it changes that ranking in a measurable and profitable way.
+This distinction is important because a customer with a high unconditional probability of purchase may still be an inefficient target for campaign expenditure if that customer would have purchased in the absence of treatment. The practical value of uplift modeling therefore depends on its ability to alter the targeting order in a measurable and economically meaningful way.
 
 \section{Data and Verified Phase I Findings}
 \subsection{Dataset}
@@ -114,8 +134,8 @@ Test-set clients with purchase history & 200{,}123 / 200{,}123 \\
 \end{tabular}
 \end{table}
 
-\subsection{Why These Findings Justify Phase II}
-These findings defend the Phase II design in three ways:
+\subsection{Implications for Phase II Design}
+These findings motivate the Phase II design in three ways:
 \begin{enumerate}
     \item The near-perfect treatment/control balance means uplift estimates can be interpreted causally without heavy post-hoc adjustment.
     \item The modest average treatment effect means a single global response model is likely to be wasteful because the mean hides heterogeneity.
@@ -141,7 +161,7 @@ The final Phase II matrix contains 44 numeric features with zero missing values 
     \item \textbf{Product behavior}: alcohol spend share, own-trademark spend share, netto aggregates, spend-share across the three \texttt{level\_1} groups, and brand concentration (HHI)
 \end{itemize}
 
-This design is defensible because it follows directly from Phase I. The hashed category hierarchy is not semantically interpretable, so the implementation does not pretend it is. Instead, it transforms product metadata into client-level behavioral features that can still carry signal.
+This feature design follows directly from the empirical lessons of Phase I. Because the hashed category hierarchy is not semantically interpretable, the implementation does not impose artificial business meaning on those fields. Instead, product metadata is converted into client-level behavioral aggregates that preserve signal while remaining methodologically honest.
 
 \subsection{Data Split}
 The Phase II pipeline uses:
@@ -152,18 +172,11 @@ The Phase II pipeline uses:
     \item a smaller inner tuning split inside the training fold only.
 \end{itemize}
 
-This is the correct compromise for the current stage of the project. It preserves a clean validation set while keeping the implementation simple enough to inspect and rerun.
+This split design preserves an untouched validation sample while keeping the modeling pipeline sufficiently transparent to inspect, reproduce, and extend.
 
 \subsection{Models}
 \subsubsection{Model A: CCP baseline}
-The CCP baseline is an \texttt{XGBClassifier} trained on control-group rows only. It predicts purchase propensity rather than treatment effect.
-
-This design is defensible because:
-\begin{itemize}
-    \item it creates a strong conventional benchmark,
-    \item it avoids learning treatment-induced behavior when estimating organic purchase likelihood,
-    \item it is exactly the sort of model a business team might deploy if uplift were ignored.
-\end{itemize}
+The CCP baseline is an \texttt{XGBClassifier} trained on control-group rows only. It predicts purchase propensity rather than treatment effect. This specification provides a strong conventional benchmark, avoids learning treatment-induced behavior when estimating organic demand, and reflects the type of model that might plausibly be deployed if uplift were ignored.
 
 \subsubsection{Model B1: Two-model logistic uplift}
 Two separate regularized logistic models are trained, one on treated customers and one on control customers. The uplift score is:
@@ -171,7 +184,7 @@ Two separate regularized logistic models are trained, one on treated customers a
 \hat{u}(x) = \hat{P}(Y=1 \mid T=1, X=x) - \hat{P}(Y=1 \mid T=0, X=x)
 \]
 
-This is the most literal implementation of the roadmap formula.
+This specification is the most direct implementation of the roadmap formula and serves as a transparent linear uplift baseline.
 
 \subsubsection{Model B2: Lo-style interaction logistic uplift}
 A single logistic model is trained on all rows with:
@@ -181,7 +194,7 @@ A single logistic model is trained on all rows with:
 \end{itemize}
 The uplift score is obtained by scoring each customer twice, once under treatment and once under control, then taking the difference.
 
-This is defensible because it provides a structured single-model alternative to the two-model approach.
+This specification provides a structured single-model alternative to the two-model approach and is useful for testing whether treatment interactions can be captured parsimoniously within one regularized estimator.
 
 \subsubsection{Model B3: Uplift random forest}
 The non-linear uplift model is implemented using \texttt{causalml}'s \texttt{UpliftRandomForestClassifier} with:
@@ -191,7 +204,7 @@ The non-linear uplift model is implemented using \texttt{causalml}'s \texttt{Upl
     \item light tuning over tree count, feature count, depth, leaf size, and regularization.
 \end{itemize}
 
-This is defensible because it is the most expressive model in the comparison and can capture non-linear treatment heterogeneity that linear models cannot.
+This model is the most expressive estimator in the comparison and is capable of representing non-linear treatment heterogeneity that the linear alternatives cannot capture.
 
 \subsection{Evaluation Framework}
 Phase II evaluates the models with four complementary views:
@@ -232,7 +245,7 @@ The completed pipeline passed all current verification checks:
     \item valid target-share bounds for Qini, liftup, and sensitivity outputs
 \end{itemize}
 
-This matters because a submission-ready report should not only present model outcomes; it should demonstrate that the pipeline itself is internally coherent.
+These checks are important because a submission-ready analysis should demonstrate not only competitive model performance, but also internal consistency of the underlying data and artifact pipeline.
 
 \section{Results}
 \subsection{Selected Hyperparameters}
@@ -280,14 +293,14 @@ Model A - CCP Baseline & -0.002239 & 0.016284 & 146.083912 & 1.0000 \\
 For completeness, the CCP baseline also achieved a predictive maximum profit of 2742.063982 under the default economics. That figure is intentionally reported separately from MPU because it is not the same business question. Predictive MP rewards finding likely buyers. MPU rewards finding customers whose behavior is changed by treatment. Those are related but not interchangeable objectives.
 
 \subsection{Interpretation}
-Three findings matter most:
+Three observations are particularly important:
 \begin{enumerate}
     \item The uplift random forest is the strongest CCU model on both Qini and MPU.
     \item The logistic uplift models show positive uplift discrimination and materially outperform the CCP baseline on top-decile liftup.
     \item The CCP baseline is excellent at ranking likely buyers, but poor at isolating persuadable buyers near the top of the list.
 \end{enumerate}
 
-That result is exactly what Phase I suggested would happen. High-frequency customers are often sure things. A strong purchase-propensity model can rank them very highly while still producing weak incremental targeting value. The uplift models reverse that logic by ranking customers on expected treatment effect.
+This pattern is consistent with the evidence reported in Phase I. High-frequency customers often behave as ``sure things'' and can therefore dominate a purchase-propensity ranking while contributing relatively little incremental value. The uplift models correct for this by ranking customers according to estimated treatment effect rather than unconditional purchase likelihood.
 
 \subsection{Figures}
 Figure~\ref{fig:qini} shows the Qini curves. The uplift random forest dominates the uplift-specific ranking metric, while the CCP baseline is negative relative to random on this criterion.
@@ -326,19 +339,19 @@ Figure~\ref{fig:sensitivity} shows that the relative ordering is not a single-po
 \label{fig:sensitivity}
 \end{figure}
 
-\section{Defense of the Work}
+\section{Methodological Assessment}
 \subsection{Why the pipeline is methodologically sound}
-The work is defensible because it avoids three common errors:
+The methodological soundness of the pipeline rests on the fact that it avoids three common errors:
 \begin{enumerate}
     \item \textbf{It does not confuse purchase likelihood with incremental value.}
     \item \textbf{It does not rely on notebook-only, hand-built outputs.}
     \item \textbf{It does not treat anonymized product categories as if they were interpretable business taxonomies.}
 \end{enumerate}
 
-Instead, the implementation follows the empirical evidence established in Phase I and uses a validation framework aligned with the targeting objective.
+Instead, the implementation follows the empirical evidence established in Phase I and applies an evaluation framework that is aligned with the actual targeting objective.
 
 \subsection{Why the model comparison is fair}
-The comparison is fair because:
+The comparison may be regarded as fair for four reasons:
 \begin{itemize}
     \item all models use the same raw source data,
     \item all models use the same engineered feature base,
@@ -347,7 +360,7 @@ The comparison is fair because:
 \end{itemize}
 
 \subsection{Why the conclusions are credible}
-The conclusions are credible because they are supported simultaneously by:
+The substantive conclusions are credible because they are supported simultaneously by:
 \begin{itemize}
     \item Phase I causal balance checks,
     \item full-run validation outputs,
@@ -357,7 +370,7 @@ The conclusions are credible because they are supported simultaneously by:
 \end{itemize}
 
 \section{Limitations}
-The current work still has limits:
+Several limitations remain:
 \begin{itemize}
     \item The hashed product hierarchy limits semantic interpretation.
     \item The current profit analysis depends on default economic assumptions, though sensitivity analysis reduces that risk.
@@ -365,7 +378,7 @@ The current work still has limits:
     \item The implementation is an experimental analysis pipeline, not a production scoring service.
 \end{itemize}
 
-These limitations are acceptable at this stage because the objective of Phase II was comparative methodology and defensible empirical evidence, not deployment.
+These limitations are acceptable at the present stage because the purpose of Phase II was comparative methodology and defensible empirical analysis rather than production deployment.
 
 \section{Conclusion}
 Phase II successfully translated the Phase I findings into a reproducible uplift-modeling comparison. The resulting pipeline demonstrates that:
@@ -375,44 +388,44 @@ Phase II successfully translated the Phase I findings into a reproducible uplift
     \item the uplift random forest is currently the strongest model under the implemented evaluation framework.
 \end{itemize}
 
-The project therefore supports the central claim that targeting customers by expected incremental response is more defensible than targeting them by unconditional purchase probability alone.
+Taken together, the results support the central claim of the project: customer targeting based on expected incremental response is more defensible than targeting based solely on unconditional purchase probability.
 
 \appendix
 \section{Relevant Code Listings}
-The report includes the most relevant implementation excerpts directly from the working codebase.
+The appendix includes the most relevant implementation excerpts directly from the working codebase. Inline comments have been added to the source files to clarify the non-obvious modeling and data-engineering decisions referenced in the main text.
 
 \subsection{Client and Product Feature Construction}
 \lstinputlisting[
   style=pythonstyle,
   firstline=45,
-  lastline=90,
-  caption={Client-level feature construction in \texttt{phase2\_features.py}},
+  lastline=95,
+  caption={Annotated client-level feature construction in \texttt{phase2\_features.py}},
   label={lst:clientfeatures}
 ]{retailhero-uplift/phase2_features.py}
 
 \lstinputlisting[
   style=pythonstyle,
-  firstline=119,
-  lastline=233,
-  caption={Product-behavior aggregation and share-feature construction in \texttt{phase2\_features.py}},
+  firstline=126,
+  lastline=295,
+  caption={Annotated product-behavior aggregation and share-feature construction in \texttt{phase2\_features.py}},
   label={lst:productfeatures}
 ]{retailhero-uplift/phase2_features.py}
 
 \subsection{Uplift Model Wrappers}
 \lstinputlisting[
   style=pythonstyle,
-  firstline=73,
-  lastline=203,
-  caption={Two-model logistic, interaction logistic, and uplift random forest wrappers in \texttt{phase2\_models.py}},
+  firstline=74,
+  lastline=210,
+  caption={Annotated uplift model wrappers in \texttt{phase2\_models.py}},
   label={lst:modelwrappers}
 ]{retailhero-uplift/phase2_models.py}
 
 \subsection{Pipeline Orchestration}
 \lstinputlisting[
   style=pythonstyle,
-  firstline=167,
-  lastline=340,
-  caption={Main orchestration flow in \texttt{phase2\_pipeline.py}},
+  firstline=159,
+  lastline=352,
+  caption={Annotated orchestration flow in \texttt{phase2\_pipeline.py}},
   label={lst:pipeline}
 ]{retailhero-uplift/phase2_pipeline.py}
 

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import matplotlib
 
+# Render plots in headless environments such as CI or remote batch runs.
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
@@ -28,6 +29,7 @@ from phase2_models import (
 
 
 def _to_builtin(obj):
+    # JSON serialization should not depend on numpy-specific scalar/container types.
     if isinstance(obj, dict):
         return {key: _to_builtin(value) for key, value in obj.items()}
     if isinstance(obj, list):
@@ -129,6 +131,8 @@ def _build_sensitivity_table(
     default_basket_value: float,
     default_sms_cost: float,
 ) -> pd.DataFrame:
+    # Reprice the same ranked validation curves under alternative economics
+    # instead of retraining models for each scenario.
     basket_values = default_basket_value * np.array([0.50, 0.75, 1.00, 1.25, 1.50])
     sms_costs = np.array([0.50, 1.00, 2.00, 3.00, 5.00]) * default_sms_cost
 
@@ -168,6 +172,7 @@ def main() -> None:
     args = parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Rebuild from raw CSVs unless the caller explicitly opts into cached features.
     bundle = build_phase2_feature_bundle(
         data_dir=args.data_dir,
         output_dir=args.output_dir,
@@ -230,6 +235,8 @@ def main() -> None:
     scored_validation = outer_valid[["client_id", "treatment_flg", "target"]].copy()
     scored_test = bundle.test[["client_id"]].copy()
 
+    # Persist both raw scores and ranks so the saved artifacts support audit,
+    # reporting, and downstream targeting simulations.
     metric_rows: list[dict[str, object]] = []
     qini_frames: list[pd.DataFrame] = []
     curve_frames: list[pd.DataFrame] = []

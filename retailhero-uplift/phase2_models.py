@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from itertools import product
 from typing import Any
 
 import numpy as np
 import pandas as pd
 from causalml.inference.tree import UpliftRandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import ParameterGrid, train_test_split
+from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier
@@ -27,6 +26,7 @@ class Phase2ModelResult:
 
 
 def make_stratification_labels(df: pd.DataFrame) -> pd.Series:
+    # Preserve the joint treatment/response mix in every split.
     return df["treatment_flg"].astype(str) + "_" + df["target"].astype(str)
 
 
@@ -105,6 +105,8 @@ class TwoModelLogisticUplift:
         )
 
     def fit(self, X: np.ndarray, treatment: np.ndarray, y: np.ndarray) -> "TwoModelLogisticUplift":
+        # Fit the treated and control response surfaces independently, then
+        # compare their predicted probabilities at scoring time.
         self.treatment_model.fit(X[treatment == 1], y[treatment == 1])
         self.control_model.fit(X[treatment == 0], y[treatment == 0])
         return self
@@ -137,6 +139,8 @@ class LoInteractionLogisticUplift:
 
     @staticmethod
     def _design_matrix(X: np.ndarray, treatment: np.ndarray) -> np.ndarray:
+        # Lo-style uplift uses one shared linear model with explicit treatment
+        # interactions rather than two separate conditional models.
         treatment = treatment.reshape(-1, 1).astype(float)
         return np.hstack([X, treatment, X * treatment])
 
@@ -167,6 +171,7 @@ class ControlOnlyXGBModel:
         )
 
     def fit(self, X: np.ndarray, treatment: np.ndarray, y: np.ndarray) -> "ControlOnlyXGBModel":
+        # Estimate the organic purchase propensity from untreated behavior only.
         control_mask = treatment == 0
         self.model.fit(X[control_mask], y[control_mask])
         return self
@@ -189,6 +194,7 @@ class CausalMLUpliftRandomForest:
 
     @staticmethod
     def _encode_treatment(treatment: np.ndarray) -> np.ndarray:
+        # causalml expects string labels for the control/treatment arms.
         return np.where(treatment == 1, "treatment", "control")
 
     def fit(self, X: np.ndarray, treatment: np.ndarray, y: np.ndarray) -> "CausalMLUpliftRandomForest":
@@ -251,6 +257,8 @@ def train_ccp_xgboost(
     X_outer_valid, _, _ = _numpy_xy(outer_valid, feature_columns)
     X_test = test_df[feature_columns].to_numpy(dtype=float)
 
+    # Keep the search space deliberately small so the comparison remains
+    # reproducible and tractable on the full dataset.
     param_grid = [
         {
             "n_estimators": 250,
@@ -316,6 +324,7 @@ def train_two_model_logistic(
     X_outer_valid, _, _ = _numpy_xy(outer_valid, feature_columns)
     X_test = test_df[feature_columns].to_numpy(dtype=float)
 
+    # Regularization strength is the primary lever for this simple baseline.
     best_score = float("-inf")
     best_params: dict[str, Any] | None = None
     for C_value in [0.1, 1.0, 10.0]:
@@ -358,6 +367,7 @@ def train_lo_logistic(
     X_outer_valid, _, _ = _numpy_xy(outer_valid, feature_columns)
     X_test = test_df[feature_columns].to_numpy(dtype=float)
 
+    # Reuse the same tuning budget as the two-model logit for a fair comparison.
     best_score = float("-inf")
     best_params: dict[str, Any] | None = None
     for C_value in [0.1, 1.0, 10.0]:
@@ -400,6 +410,8 @@ def train_uplift_random_forest(
     X_outer_valid, _, _ = _numpy_xy(outer_valid, feature_columns)
     X_test = test_df[feature_columns].to_numpy(dtype=float)
 
+    # The forest receives a light grid because training cost is materially higher
+    # than the linear baselines on the full feature matrix.
     param_grid = [
         {
             "n_estimators": 25,

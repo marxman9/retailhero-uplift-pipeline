@@ -48,14 +48,19 @@ def _read_clients(clients_path: str | Path, campaign_date: pd.Timestamp) -> pd.D
         parse_dates=["first_issue_date", "first_redeem_date"],
     )
 
+    # Preserve the original age field but add a bounded version for modeling and
+    # an explicit anomaly flag so bad source values are still auditable.
     clients["age_flagged"] = ((clients["age"] < 0) | (clients["age"] > 100)).astype(int)
     clients["age_clean"] = clients["age"].clip(lower=0, upper=100)
 
+    # Expand the anonymized gender code into a model-friendly indicator set.
     clients["gender_M"] = (clients["gender"] == "M").astype(int)
     clients["gender_F"] = (clients["gender"] == "F").astype(int)
     clients["gender_U"] = (clients["gender"] == "U").astype(int)
     clients["gender_known"] = (clients["gender"] != "U").astype(int)
 
+    # Redemption timing is structurally missing for customers who never redeemed,
+    # so we pair every filled value with a missingness indicator.
     clients["ever_redeemed"] = clients["first_redeem_date"].notna().astype(int)
     clients["days_to_redeem"] = (
         clients["first_redeem_date"] - clients["first_issue_date"]
@@ -91,6 +96,8 @@ def _read_clients(clients_path: str | Path, campaign_date: pd.Timestamp) -> pd.D
 
 
 def compute_empirical_avg_basket_value(purchases_path: str | Path) -> float:
+    # Use the empirical average trip value as the default business value in the
+    # profit simulations so the pipeline stays data-driven by default.
     conn = _connect()
     try:
         avg_value = conn.execute(
@@ -124,6 +131,8 @@ def _build_product_behavior_features(
     netto_p99 = product_meta["netto_p99"]
     level1_categories = product_meta["level1_categories"]
 
+    # Build one spend accumulator per observed hashed top-level category so the
+    # final client-level matrix captures category mix without assuming semantics.
     category_spend_cols = ",\n".join(
         [
             f"    sum(case when level_1 = '{category}' then purchase_sum else 0 end) "
@@ -134,6 +143,8 @@ def _build_product_behavior_features(
 
     conn = _connect()
     try:
+        # Push the wide product-behavior aggregation into DuckDB so the largest
+        # table never has to be materialized in pandas at full granularity.
         query = f"""
         with products_clean as (
           select
@@ -216,6 +227,7 @@ def _build_product_behavior_features(
 
 
 def _add_share_features(df: pd.DataFrame, level1_categories: list[str]) -> pd.DataFrame:
+    # Shares normalize raw spend totals into comparable behavioral signals.
     total_spend = df["total_spend"].replace(0, np.nan)
 
     df["alcohol_spend_share"] = (df["alcohol_spend"] / total_spend).fillna(0)
@@ -238,6 +250,8 @@ def _fill_missing_with_indicators(
     test: pd.DataFrame,
     id_columns: set[str],
 ) -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
+    # All downstream models expect a fully numeric matrix. Missingness indicators
+    # preserve information while deterministic sentinel filling removes NaNs.
     combined = pd.concat(
         [
             train.assign(_dataset="train"),
@@ -262,6 +276,7 @@ def _fill_missing_with_indicators(
             if observed.empty:
                 fill_value = -1.0
             elif (observed >= 0).all():
+                # Use a shared negative sentinel for naturally non-negative fields.
                 fill_value = -1.0
             else:
                 fill_value = float(observed.min()) - 1.0
@@ -341,6 +356,8 @@ def build_phase2_feature_bundle(
         product_meta,
     )
 
+    # Join every feature family at the client level before appending treatment
+    # labels or exporting the cached train/test matrices.
     feature_core = (
         client_features.merge(purchase_features, on="client_id", how="left")
         .merge(product_features, on="client_id", how="left")
