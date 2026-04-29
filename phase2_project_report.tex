@@ -39,12 +39,22 @@
 }
 
 \title{Phase II Project Report\\RetailHero Uplift Modeling: CCP vs CCU Evaluation}
-\author{Aniket}
+\author{Team Submission}
 \date{29 April 2026}
 
 \begin{document}
 
 \maketitle
+
+\begin{center}
+\large \textbf{Course:} HSL-530 Data Analytics for Business \& Society
+
+\vspace{0.4em}
+\normalsize
+\textbf{Team Members:} Anand Deep (21322003), Aniket (21322005), Madhav Mukund (21322018), Param Mahabare (21322021)
+\end{center}
+
+\vspace{1em}
 
 \begin{abstract}
 This report documents the Phase II implementation of a value-aware uplift-modeling pipeline for the RetailHero / X5 retail intervention dataset. The work extends Phase I, which established that the campaign was effectively randomized, that the average treatment effect was modest, and that response heterogeneity was large enough to justify uplift modeling. Phase II operationalizes that finding by comparing a standard customer purchase-propensity baseline (CCP) against three customer churn uplift (CCU) estimators under one reproducible evaluation framework. The pipeline rebuilds features directly from the raw CSV files, trains all models on the full extracted dataset, evaluates them on a stratified holdout set, and reports Qini, liftup, predictive maximum profit, and maximum profit uplift. The final result is that the uplift random forest is the strongest incremental-targeting model, outperforming the CCP baseline on uplift-specific metrics while preserving a transparent, reproducible workflow.
