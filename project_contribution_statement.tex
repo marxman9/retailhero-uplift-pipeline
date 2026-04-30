@@ -1,0 +1,67 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+\geometry{margin=1in}
+\setlength{\emergencystretch}{3em}
+\renewcommand{\arraystretch}{1.15}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=blue
+}
+
+\title{Project Statement of Work Contribution\\RetailHero Uplift Modeling: Phase II}
+\author{HSL-530 Data Analytics for Business \& Society}
+\date{30 April 2026}
+
+\begin{document}
+
+\hypersetup{pageanchor=false}
+\begin{titlepage}
+\centering
+{\Large \textbf{HSL-530}\par}
+\vspace{0.25cm}
+{\large Data Analytics for Business \& Society\par}
+
+\vspace{2cm}
+{\Huge \textbf{Project Statement of Work Contribution}\par}
+\vspace{0.6cm}
+{\LARGE RetailHero Uplift Modeling: Phase II\par}
+
+\vspace{1.6cm}
+{\large Submitted by\par}
+\vspace{0.4cm}
+{\large Anand Deep (21322003)\par}
+{\large Aniket (21322005)\par}
+{\large Madhav Mukund (21322018)\par}
+{\large Param Mahabare (21322021)\par}
+
+\vfill
+{\large 30 April 2026\par}
+\end{titlepage}
+\hypersetup{pageanchor=true}
+
+\begin{table}[h]
+\centering
+\caption{Primary division of work}
+\begin{tabular}{L{0.20\textwidth} L{0.29\textwidth} L{0.39\textwidth}}
+\toprule
+\textbf{Team member} & \textbf{Primary responsibility} & \textbf{Delivered work} \\
+\midrule
+Anand Deep & Data cleaning and exploratory analysis & Raw-data checking, anomaly identification, treatment-balance verification, and Phase I exploratory findings used to guide later feature design. \\
+Madhav Mukund & Linear uplift model selection and implementation & Two-model logistic uplift and Lo-style interaction logistic uplift, including shared validation comparisons for the linear estimators. \\
+Param Mahabare & Benchmark and non-linear model implementation & Control-only XGBoost CCP baseline and uplift random forest, including tuning decisions and comparative model outputs. \\
+Aniket & Integration, wrap-up, presentation, and collaboration & End-to-end pipeline consolidation, artifact generation, report and presentation preparation, and final submission coordination. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{document}
