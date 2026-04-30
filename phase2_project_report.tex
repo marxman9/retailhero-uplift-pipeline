@@ -42,7 +42,7 @@
   captionpos=b
 }
 
-\title{Phase II Project Report\\RetailHero Uplift Modeling: CCP vs CCU Evaluation}
+\title{Phase II Collaborative Project Report\\RetailHero Uplift Modeling: CCP vs CCU Evaluation}
 \author{Team Submission}
 \date{29 April 2026}
 
@@ -75,7 +75,7 @@
 
 \pagenumbering{roman}
 \begin{abstract}
-This report presents the Phase II implementation and evaluation of a value-aware uplift-modeling pipeline for the RetailHero / X5 retail intervention dataset. Phase I established that campaign assignment was effectively randomized, that the average treatment effect was positive but modest, and that treatment response varied materially across customer segments. Phase II builds on those findings by comparing a conventional customer purchase-propensity benchmark (CCP) with three customer churn uplift (CCU) estimators under a common experimental framework. Features are reconstructed directly from the raw source files, models are trained on a stratified development split, and performance is assessed on a held-out validation sample using Qini, liftup, predictive maximum profit, and maximum profit uplift. The empirical results indicate that the uplift random forest provides the strongest incremental-targeting performance, whereas the CCP benchmark is most appropriately interpreted as a non-causal propensity baseline.
+This report presents the Phase II implementation and evaluation of a value-aware uplift-modeling pipeline for the RetailHero / X5 retail intervention dataset and formally documents the division of work across the project team. Phase I established that campaign assignment was effectively randomized, that the average treatment effect was positive but modest, and that treatment response varied materially across customer segments. Phase II builds on those findings by comparing a conventional customer purchase-propensity benchmark (CCP) with three customer churn uplift (CCU) estimators under a common experimental framework. Features are reconstructed directly from the raw source files, models are trained on a stratified development split, and performance is assessed on a held-out validation sample using Qini, liftup, predictive maximum profit, and maximum profit uplift. The empirical results indicate that the uplift random forest provides the strongest incremental-targeting performance, whereas the CCP benchmark is most appropriately interpreted as a non-causal propensity baseline.
 \end{abstract}
 
 \newpage
@@ -493,6 +493,25 @@ python .\verify_phase1_findings.py
 python .\phase2_pipeline.py --reuse-features
 python .\verify_phase2_outputs.py
 \end{lstlisting}
+
+\section{Division of Work}
+\noindent Table~\ref{tab:contributions_appendix} records the primary ownership of the major completed workstreams. The table is intended as a concise contribution statement rather than a technical part of the methodology.
+
+\begin{table}[H]
+\centering
+\caption{Concise statement of primary team contributions}
+\label{tab:contributions_appendix}
+\begin{tabular}{p{0.18\textwidth} p{0.34\textwidth} p{0.34\textwidth}}
+\toprule
+\textbf{Team member} & \textbf{Primary responsibility} & \textbf{Delivered work} \\
+\midrule
+Anand Deep & Data cleaning and EDA & Raw-data checking, anomaly identification, treatment-balance verification, and Phase I exploratory findings used to guide feature design. \\
+Madhav Mukund & Linear uplift model selection and implementation & Two-model logistic uplift and Lo-style interaction logistic uplift, including comparative validation under the shared evaluation setup. \\
+Param Mahabare & Benchmark and non-linear model implementation & Control-only XGBoost CCP baseline and uplift random forest, including tuning choices and comparative model outputs. \\
+Aniket & Integration, wrap-up, presentation, and collaboration & End-to-end pipeline consolidation, artifact generation, report and presentation preparation, and final submission coordination. \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \begin{thebibliography}{9}
 \bibitem{devriendt2021}
